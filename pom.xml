@@ -6,7 +6,7 @@
     <groupId>YesNoFormat</groupId>
     <artifactId>YesNoFormat</artifactId> <!--Keep a note of this one: this is the ID used in the "auto add cards" method-->
     <name>Yes No Format</name>
-    <version>0.0.1</version>
+    <version>0.0.2</version>
     <description>Adds a new mistake.</description>
 
     <properties>

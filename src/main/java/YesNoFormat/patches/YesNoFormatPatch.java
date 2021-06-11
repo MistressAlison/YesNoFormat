@@ -6,14 +6,17 @@ import com.badlogic.gdx.graphics.g2d.Batch;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.evacipated.cardcrawl.mod.stslib.fields.cards.AbstractCard.SneckoField;
 import com.evacipated.cardcrawl.modthespire.lib.*;
 import com.megacrit.cardcrawl.cards.AbstractCard;
 import com.megacrit.cardcrawl.core.CardCrawlGame;
 import com.megacrit.cardcrawl.helpers.FontHelper;
 import com.megacrit.cardcrawl.screens.SingleCardViewPopup;
+import com.megacrit.cardcrawl.ui.panels.EnergyPanel;
 import javassist.CannotCompileException;
 import javassist.CtBehavior;
 import javassist.expr.ExprEditor;
+import javassist.expr.FieldAccess;
 import javassist.expr.MethodCall;
 import org.apache.commons.lang3.math.NumberUtils;
 
@@ -192,15 +195,17 @@ public class YesNoFormatPatch {
     public static class FixEnergyRenderPls {
         @SpireInsertPatch(locator = Locator.class, localvars = {"text"})
         public static void pls(AbstractCard __instance, SpriteBatch sb, @ByRef String[] text) {
-            if (NumberUtils.isCreatable(text[0])) {
-                Number n = NumberUtils.createNumber(text[0]);
-                if (n.intValue() > 0) {
-                    text[0] = YES;
-                } else {
-                    text[0] = NO;
+            if (!SneckoField.snecko.get(__instance)) {
+                if (NumberUtils.isCreatable(text[0])) {
+                    Number n = NumberUtils.createNumber(text[0]);
+                    if (n.intValue() > 0) {
+                        text[0] = YES;
+                    } else {
+                        text[0] = NO;
+                    }
+                } else if (__instance.cost == -1 && YesNoFormatMod.enableMaybe) {
+                    text[0] = MAYBE;
                 }
-            } else if (__instance.cost == -1 && YesNoFormatMod.enableMaybe) {
-                text[0] = MAYBE;
             }
         }
         private static class Locator extends SpireInsertLocator {
@@ -228,14 +233,17 @@ public class YesNoFormatPatch {
                                 "if(YesNoFormat.YesNoFormatMod.enableMaybe && this.card.cost == -1) {" +
                                 //$1 refers to the first input parameter of the method, in this case the float that Gdx.graphics.getDeltaTime() returns
                                 "$3 = YesNoFormat.patches.YesNoFormatPatch.MAYBE;" +
+                                "$4 = $4 - 128.0F * com.megacrit.cardcrawl.core.Settings.scale;" +
                                 "}" +
                                 "if(this.card.cost == 0) {" +
                                 //$1 refers to the first input parameter of the method, in this case the float that Gdx.graphics.getDeltaTime() returns
                                 "$3 = YesNoFormat.patches.YesNoFormatPatch.NO;" +
+                                "$4 = $4 - 30.0F * com.megacrit.cardcrawl.core.Settings.scale;" +
                                 "}" +
                                 "if(this.card.cost > 0) {" +
                                 //$1 refers to the first input parameter of the method, in this case the float that Gdx.graphics.getDeltaTime() returns
                                 "$3 = YesNoFormat.patches.YesNoFormatPatch.YES;" +
+                                "$4 = $4 - 60.0F * com.megacrit.cardcrawl.core.Settings.scale;" +
                                 "}" +
                                 "}" +
                                 //Call the method as normal
@@ -244,6 +252,46 @@ public class YesNoFormatPatch {
                     }
                 }
             };
+        }
+    }
+
+    @SpirePatch2(clz = AbstractCard.class, method = "initializeDescriptionCN")
+    public static class BetterWidthPls {
+        @SpireInstrumentPatch
+        public static ExprEditor patch() {
+            return new ExprEditor() {
+                @Override
+                //Method call is basically the equivalent of a methodcallmatcher of an insert patch, checks the edit method against every method call in the function you#re patching
+                public void edit(FieldAccess m) throws CannotCompileException {
+                    //If the method is from the class AnimationState and the method is called update
+                    if (m.getFieldName().equals("MAGIC_NUM_W")) {
+                        m.replace("{" +
+                                "$_ = 60.0F * com.megacrit.cardcrawl.core.Settings.scale;" +
+                                //Call the method as normal
+                                "$proceed($$);" +
+                                "}");
+                    }
+                }
+            };
+        }
+    }
+
+    @SpirePatch(clz = EnergyPanel.class, method = "render")
+    public static class ShortenEnergyOrb {
+        @SpireInsertPatch(locator = Locator.class, localvars = {"energyMsg"})
+        public static void pls(EnergyPanel __instance, SpriteBatch sb, @ByRef String[] energyMsg) {
+            if (EnergyPanel.totalCount > 0) {
+                energyMsg[0] = YES;
+            } else {
+                energyMsg[0] = NO;
+            }
+        }
+        private static class Locator extends SpireInsertLocator {
+            @Override
+            public int[] Locate(CtBehavior ctMethodToPatch) throws Exception {
+                com.evacipated.cardcrawl.modthespire.lib.Matcher finalMatcher = new com.evacipated.cardcrawl.modthespire.lib.Matcher.MethodCallMatcher(FontHelper.class, "renderFontCentered");
+                return LineFinder.findInOrder(ctMethodToPatch, finalMatcher);
+            }
         }
     }
 }
