@@ -21,6 +21,7 @@ import javassist.expr.MethodCall;
 import org.apache.commons.lang3.math.NumberUtils;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -33,30 +34,33 @@ public class YesNoFormatPatch {
     private static String processString(String str) {
         //If the string we are trying to edit is not null///
         if (str != null) {
-            //Define a string list for all the numbers we find
-            ArrayList<String> numbers = new ArrayList<>();
-            //This matches any number and will cause issues with mods that have numbers in the name
-            //Pattern p = Pattern.compile("\\d+");
-            //This matches any number that isnt part of a formatting thing like "m10robot:"
-            Pattern p = Pattern.compile("(?!\\S+?[:]\\S)\\d+");
-            Matcher m = p.matcher(str);
-            //Add add the string matches to our list
-            while (m.find()) {
-                numbers.add(m.group());
-            }
-            //Loop through our strings we found
-            for (String s : numbers) {
-                //Ensure it is a creatable number to get the value
-                if (NumberUtils.isCreatable(s)) {
-                    Number n = NumberUtils.createNumber(s);
-                    //If the value is not 0, input yes, else no
-                    if (n.intValue() > 0) {
-                        str = str.replace(s, YES);
-                    } else {
-                        str = str.replace(s, NO);
+            String[] words = str.split(" ");
+            //Iterate all words
+            for (int i = 0 ; i < words.length ; i++) {
+                //If the word doesnt have ! or [ or = or : or # (dynvars, icons, dyntext, keywords)
+                if (!words[i].contains("!") && !words[i].contains("[") && !words[i].contains("=") && !words[i].contains(":")) {
+                    //Compile a list of all numbers
+                    ArrayList<String> numbers = new ArrayList<>();
+                    Pattern p = Pattern.compile("\\d+");
+                    Matcher m = p.matcher(words[i]);
+                    while (m.find()) {
+                        numbers.add(m.group());
+                    }
+                    //Replace the numbers with YES or NO
+                    for (String num : numbers) {
+                        if (NumberUtils.isCreatable(num)) {
+                            Number n = NumberUtils.createNumber(num);
+                            //If the value is not 0, input yes, else no
+                            if (n.intValue() > 0) {
+                                words[i] = words[i].replace(num, YES);
+                            } else {
+                                words[i] = words[i].replace(num, NO);
+                            }
+                        }
                     }
                 }
             }
+            str = String.join(" ", words);
         }
         return str;
     }
@@ -169,24 +173,15 @@ public class YesNoFormatPatch {
         }
     }
 
-    public static class fixHardcodedNumbersPls {
-        static String backupText = "";
+    public static class FixHardcodedNumbersPls {
         @SpirePatch(clz = AbstractCard.class, method = "initializeDescription")
         public static class DontMessUpSpacingPls {
             @SpirePrefixPatch
-            public static void pls(AbstractCard __instance) {
-                backupText = __instance.rawDescription;
-                __instance.rawDescription = processString(__instance.rawDescription);
-                if (__instance.cost == -1 && YesNoFormatMod.enableMaybe) {
-                    __instance.rawDescription = processXCost(__instance.rawDescription);
+            public static void pls(@ByRef AbstractCard[] __instance) {
+                __instance[0].rawDescription = processString(__instance[0].rawDescription);
+                if (__instance[0].cost == -1 && YesNoFormatMod.enableMaybe) {
+                    __instance[0].rawDescription = processXCost(__instance[0].rawDescription);
                 }
-            }
-        }
-        @SpirePatch(clz = AbstractCard.class, method = "initializeDescription")
-        public static class BackToNormal {
-            @SpirePostfixPatch
-            public static void pls(AbstractCard __instance) {
-                __instance.rawDescription = backupText;
             }
         }
     }
